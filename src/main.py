@@ -19,5 +19,4 @@ async def shutdown_db_client():
 
 
 
-app.include_router(base.base_router)
 app.include_router(data.router_data)
