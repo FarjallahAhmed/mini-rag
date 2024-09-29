@@ -21,7 +21,7 @@ router_data = APIRouter(
 @router_data.post("/upload/{project_id}")
 async def upload_data(request: Request,project_id: str, file: UploadFile, app_settings : Settings = Depends(get_settings)):
 
-    project_model = ProjectModel(request.app.db_client)
+    project_model = await ProjectModel.create_instance(request.app.db_client)
 
     project = await project_model.get_or_create_project(project_id=project_id)
 
@@ -65,8 +65,9 @@ async def process(project_id,process_request: ProcessRequest,request: Request):
 
     process = ProcessController(project_id=project_id)
     file_content = process.get_file_content(file_id=process_request.file_id)
+    do_reset = process_request.do_reset
 
-    project_model = ProjectModel(request.app.db_client)
+    project_model = await ProjectModel.create_instance(request.app.db_client)
 
     project = await project_model.get_or_create_project(project_id=project_id)
     
@@ -90,13 +91,16 @@ async def process(project_id,process_request: ProcessRequest,request: Request):
             chunk_text=chunk.page_content,
             chunk_metadata=chunk.metadata,
             chunk_order=i+1,
-            chunk_object_id=project.id
+            chunk_project_id=project.id
         )
         for i,chunk in enumerate(file_chunks)
     ]
 
-    chunk_model = ChunkModel(request.app.db_client)
-
+    chunk_model = await ChunkModel.create_instance(request.app.db_client)
+    if do_reset == 1:
+        _ = await chunk_model.delete_chunks_by_project_id(
+            project_id=project.id
+        )
     no_recodrs = await chunk_model.insert_many_chunks(chunks=file_chunk_records)
     
     return JSONResponse(
